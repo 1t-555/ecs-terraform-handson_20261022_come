@@ -1,0 +1,52 @@
+name: "Terraform CI/CD Deploy"
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write # OIDC認証に必要なアクセス許可
+  contents: read
+
+jobs:
+  terraform:
+    name: "Terraform Apply"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./infra
+
+    steps:
+      # 1. リポジトリのコードをチェックアウト
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. AWS OIDC 認証（GitHub Secrets に登録した AWS_ROLE_ARN を使用）
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-northeast-1
+
+      # 3. Terraform CLI のセットアップ
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.11.0"
+
+      # 4. Terraform 初期化（S3 Backend への接続）
+      - name: Terraform Init
+        run: terraform init
+
+      # 5. 構文と設定の最終検証
+      - name: Terraform Validate
+        run: terraform validate -no-color
+
+      # 6. 変更計画の作成（ログ確認用）
+      - name: Terraform Plan
+        run: terraform plan -no-color
+
+      # 7. インフラの自動適用・構築
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -no-color
